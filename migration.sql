@@ -1,0 +1,1941 @@
+--
+-- PostgreSQL database dump
+--
+
+\restrict Rc189lXLKcLfmvELOkt1wTuXgJWkpA2isn2jWwsY6How0lVNEKWgpcL1IIu7ljw
+
+-- Dumped from database version 17.6
+-- Dumped by pg_dump version 17.8 (Homebrew)
+
+SET statement_timeout = 0;
+SET lock_timeout = 0;
+SET idle_in_transaction_session_timeout = 0;
+SET transaction_timeout = 0;
+SET client_encoding = 'UTF8';
+SET standard_conforming_strings = on;
+SELECT pg_catalog.set_config('search_path', '', false);
+SET check_function_bodies = false;
+SET xmloption = content;
+SET client_min_messages = warning;
+SET row_security = off;
+
+--
+-- Name: public; Type: SCHEMA; Schema: -; Owner: -
+--
+
+CREATE SCHEMA public;
+
+
+--
+-- Name: SCHEMA public; Type: COMMENT; Schema: -; Owner: -
+--
+
+COMMENT ON SCHEMA public IS 'standard public schema';
+
+
+--
+-- Name: rls_auto_enable(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.rls_auto_enable() RETURNS event_trigger
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'pg_catalog'
+    AS $$
+DECLARE
+  cmd record;
+BEGIN
+  FOR cmd IN
+    SELECT *
+    FROM pg_event_trigger_ddl_commands()
+    WHERE command_tag IN ('CREATE TABLE', 'CREATE TABLE AS', 'SELECT INTO')
+      AND object_type IN ('table','partitioned table')
+  LOOP
+     IF cmd.schema_name IS NOT NULL AND cmd.schema_name IN ('public') AND cmd.schema_name NOT IN ('pg_catalog','information_schema') AND cmd.schema_name NOT LIKE 'pg_toast%' AND cmd.schema_name NOT LIKE 'pg_temp%' THEN
+      BEGIN
+        EXECUTE format('alter table if exists %s enable row level security', cmd.object_identity);
+        RAISE LOG 'rls_auto_enable: enabled RLS on %', cmd.object_identity;
+      EXCEPTION
+        WHEN OTHERS THEN
+          RAISE LOG 'rls_auto_enable: failed to enable RLS on %', cmd.object_identity;
+      END;
+     ELSE
+        RAISE LOG 'rls_auto_enable: skip % (either system schema or not in enforced list: %.)', cmd.object_identity, cmd.schema_name;
+     END IF;
+  END LOOP;
+END;
+$$;
+
+
+--
+-- Name: set_updated_at(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.set_updated_at() RETURNS trigger
+    LANGUAGE plpgsql
+    SET search_path TO 'pg_catalog', 'public'
+    AS $$
+begin
+  new.updated_at = now();
+  return new;
+end;
+$$;
+
+
+--
+-- Name: update_updated_at_column(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.update_updated_at_column() RETURNS trigger
+    LANGUAGE plpgsql
+    SET search_path TO 'pg_catalog', 'public'
+    AS $$
+BEGIN
+    NEW.updated_at = NOW();
+    RETURN NEW;
+END;
+$$;
+
+
+SET default_tablespace = '';
+
+SET default_table_access_method = heap;
+
+--
+-- Name: admin_sessions; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.admin_sessions (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    device_id text NOT NULL,
+    is_active boolean DEFAULT true,
+    created_at timestamp with time zone DEFAULT now()
+);
+
+
+--
+-- Name: admin_settings; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.admin_settings (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    admin_password text NOT NULL
+);
+
+
+--
+-- Name: announcements; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.announcements (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    title text NOT NULL,
+    content text,
+    author text,
+    is_pinned boolean DEFAULT false,
+    created_at timestamp with time zone DEFAULT now(),
+    author_id uuid
+);
+
+
+--
+-- Name: av_team; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.av_team (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    full_name text NOT NULL,
+    email text NOT NULL,
+    title text,
+    company text DEFAULT 'Alumni Ventures'::text,
+    club_role text DEFAULT 'Mentor'::text,
+    bio text,
+    emoji text DEFAULT '👤'::text,
+    fun_fact text,
+    linkedin_url text,
+    phone text,
+    location text,
+    timezone text DEFAULT 'America/New_York'::text,
+    is_active boolean DEFAULT true,
+    is_visible_to_members boolean DEFAULT false,
+    created_at timestamp with time zone DEFAULT now(),
+    photo_url text
+);
+
+
+--
+-- Name: content; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.content (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    title text NOT NULL,
+    description text,
+    type text DEFAULT 'article'::text,
+    category text,
+    url text,
+    duration text,
+    thumbnail_url text,
+    author text,
+    file_name text,
+    featured boolean DEFAULT false,
+    sort_order integer DEFAULT 0,
+    created_at timestamp with time zone DEFAULT now()
+);
+
+
+--
+-- Name: deal_interests; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.deal_interests (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    member_id uuid NOT NULL,
+    deal_id uuid NOT NULL,
+    interest_type text NOT NULL,
+    investment_amount numeric,
+    reason text,
+    status text DEFAULT 'pending'::text,
+    email_sent boolean DEFAULT false,
+    email_sent_at timestamp with time zone,
+    email_error text,
+    created_at timestamp with time zone DEFAULT now(),
+    updated_at timestamp with time zone DEFAULT now(),
+    archived boolean DEFAULT false NOT NULL
+);
+
+
+--
+-- Name: deals; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.deals (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    company_name text NOT NULL,
+    headline text,
+    sector text,
+    stage text,
+    description text,
+    raise_amount text,
+    valuation text,
+    lead_investor text,
+    av_allocation text,
+    minimum_check text,
+    status text DEFAULT 'new'::text,
+    voting_deadline date,
+    deal_deadline date,
+    memo_url text,
+    deck_url text,
+    portal_url text,
+    highlights jsonb DEFAULT '[]'::jsonb,
+    risks jsonb DEFAULT '[]'::jsonb,
+    created_at timestamp with time zone DEFAULT now(),
+    company_logo text,
+    company_url text,
+    additional_media jsonb DEFAULT '[]'::jsonb,
+    source_deal_id uuid,
+    closes_at timestamp with time zone,
+    interest_active boolean DEFAULT false NOT NULL,
+    archived_at timestamp with time zone
+);
+
+
+--
+-- Name: intro_requests; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.intro_requests (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    from_member_id uuid,
+    to_member_id uuid,
+    reason text,
+    note text,
+    proposed_format text,
+    suggested_format text,
+    status text DEFAULT 'pending'::text,
+    email_shared boolean DEFAULT false,
+    email_shared_at timestamp with time zone,
+    created_at timestamp with time zone DEFAULT now(),
+    responded_at timestamp with time zone
+);
+
+
+--
+-- Name: member_blocks; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.member_blocks (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    blocker_id uuid,
+    blocked_id uuid,
+    created_at timestamp with time zone DEFAULT now()
+);
+
+
+--
+-- Name: member_reports; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.member_reports (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    reporter_id uuid,
+    reported_id uuid,
+    reason text,
+    note text,
+    status text DEFAULT 'pending'::text,
+    admin_notes text,
+    reviewed_by text,
+    reviewed_at timestamp with time zone,
+    created_at timestamp with time zone DEFAULT now()
+);
+
+
+--
+-- Name: member_sessions; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.member_sessions (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    member_id uuid,
+    device_id text NOT NULL,
+    is_active boolean DEFAULT true,
+    created_at timestamp with time zone DEFAULT now()
+);
+
+
+--
+-- Name: members; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.members (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    full_name text NOT NULL,
+    email text NOT NULL,
+    must_change_password boolean DEFAULT false,
+    emoji text DEFAULT '👤'::text,
+    headline text,
+    photo_url text,
+    phone text,
+    location text,
+    timezone text DEFAULT 'America/New_York'::text,
+    linkedin_url text,
+    whatsapp text,
+    calendly_url text,
+    preferred_contact text DEFAULT 'email'::text,
+    member_role text,
+    member_company text,
+    sector_interests jsonb DEFAULT '[]'::jsonb,
+    stage_interest jsonb DEFAULT '[]'::jsonb,
+    geography_preference jsonb DEFAULT '[]'::jsonb,
+    deal_role_preference jsonb DEFAULT '[]'::jsonb,
+    theme_tags jsonb DEFAULT '[]'::jsonb,
+    personal_statement text,
+    why_joined text,
+    hoping_to_get jsonb DEFAULT '[]'::jsonb,
+    vc_experience_level text DEFAULT 'new'::text,
+    learning_goals jsonb DEFAULT '[]'::jsonb,
+    fun_fact text,
+    outside_interests jsonb DEFAULT '[]'::jsonb,
+    languages jsonb DEFAULT '[]'::jsonb,
+    open_to_chats boolean DEFAULT true,
+    chat_format text,
+    best_times jsonb DEFAULT '[]'::jsonb,
+    email_visible boolean DEFAULT false,
+    whatsapp_visible boolean DEFAULT false,
+    calendly_visible boolean DEFAULT false,
+    onboarding_complete boolean DEFAULT false,
+    code_of_conduct_accepted boolean DEFAULT false,
+    is_manager boolean DEFAULT false,
+    admin_accreditation_status text,
+    admin_check_size_band text,
+    admin_past_av_investments boolean DEFAULT false,
+    admin_investment_count integer DEFAULT 0,
+    admin_compliance_flags jsonb DEFAULT '[]'::jsonb,
+    admin_restricted_notes text,
+    admin_agreement_signed boolean DEFAULT false,
+    admin_internal_owner text,
+    admin_internal_notes text,
+    admin_last_contact_date date,
+    created_at timestamp with time zone DEFAULT now(),
+    migration_status text DEFAULT 'pending'::text,
+    auth_user_id uuid,
+    linkedin_connected boolean DEFAULT false,
+    linkedin_sub text,
+    linkedin_photo_url text,
+    linkedin_name text,
+    linkedin_connected_at timestamp with time zone,
+    deals_disclosure_accepted_at timestamp with time zone,
+    investment_advice_ack_at timestamp with time zone,
+    investment_advice_ack_name text,
+    conflicts_ack_at timestamp with time zone,
+    linkedin_prompt_skipped_at timestamp with time zone,
+    linkedin_prompt_dismissed_at timestamp with time zone
+);
+
+
+--
+-- Name: messages; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.messages (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    thread_id uuid,
+    from_member_id uuid,
+    to_member_id uuid,
+    intro_request_id uuid,
+    content text NOT NULL,
+    read boolean DEFAULT false,
+    read_at timestamp with time zone,
+    created_at timestamp with time zone DEFAULT now()
+);
+
+
+--
+-- Name: password_reset_codes; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.password_reset_codes (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    email text NOT NULL,
+    code_hash text NOT NULL,
+    expires_at timestamp with time zone NOT NULL,
+    used_at timestamp with time zone,
+    attempts integer DEFAULT 0 NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: portfolio_investments; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.portfolio_investments (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    member_id uuid,
+    news text,
+    investment_date date,
+    dd_report_url text,
+    amount_invested numeric,
+    cost_basis numeric,
+    current_value numeric,
+    exit_status text DEFAULT 'Active'::text,
+    created_at timestamp with time zone DEFAULT now(),
+    deal_id uuid
+);
+
+
+--
+-- Name: session_rsvps; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.session_rsvps (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    session_id uuid,
+    member_id uuid,
+    attending boolean NOT NULL,
+    created_at timestamp with time zone DEFAULT now()
+);
+
+
+--
+-- Name: sessions; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.sessions (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    title text NOT NULL,
+    description text,
+    type text DEFAULT 'seminar'::text,
+    date date,
+    "time" text,
+    timezone text DEFAULT 'EST'::text,
+    duration integer DEFAULT 60,
+    host_name text,
+    host_title text,
+    host_linkedin text,
+    zoom_link text,
+    recording_url text,
+    deal_id uuid,
+    created_at timestamp with time zone DEFAULT now(),
+    google_calendar_link text,
+    attendees jsonb DEFAULT '[]'::jsonb,
+    participants jsonb DEFAULT '[]'::jsonb,
+    meeting_notes text DEFAULT ''::text,
+    member_notes jsonb DEFAULT '{}'::jsonb NOT NULL
+);
+
+
+--
+-- Name: site_settings; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.site_settings (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    club_name text DEFAULT 'Next Gen'::text,
+    club_subtitle text DEFAULT 'Venture Club'::text,
+    cohort_name text DEFAULT 'Cohort 1'::text,
+    primary_color text DEFAULT '#1B4D5C'::text,
+    accent_color text DEFAULT '#C9A227'::text,
+    logo_url text DEFAULT '/av-logo.png'::text,
+    created_at timestamp with time zone DEFAULT now(),
+    logo_background_color text DEFAULT '#1B4D5C'::text,
+    cohort_number text,
+    email_test_mode boolean DEFAULT true
+);
+
+
+--
+-- Data for Name: admin_sessions; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY public.admin_sessions (id, device_id, is_active, created_at) FROM stdin;
+b4ecc5ee-4124-43e9-8fbd-6e227e86e000	device_igpbp2ise_1786564597456	t	2026-08-12 20:10:50.893797+00
+e1d4dbcf-df66-4880-83b4-0f095347ce3f	device_rbom9bbh1_1786635706664	t	2026-08-13 15:45:42.326067+00
+\.
+
+
+--
+-- Data for Name: admin_settings; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY public.admin_settings (id, admin_password) FROM stdin;
+\.
+
+
+--
+-- Data for Name: announcements; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY public.announcements (id, title, content, author, is_pinned, created_at, author_id) FROM stdin;
+\.
+
+
+--
+-- Data for Name: av_team; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY public.av_team (id, full_name, email, title, company, club_role, bio, emoji, fun_fact, linkedin_url, phone, location, timezone, is_active, is_visible_to_members, created_at, photo_url) FROM stdin;
+a1b904f3-07d3-4272-8694-23ca73e8d552	Cate Woolsey	cate.woolsey@av.vc	AI Associate	Alumni Ventures	Club Operations	I recently graduated from Middlebury College, where I majored in Computer Science and minored in the History of Art and Architecture. My interests lie at the intersection of art, technology, and growth—exploring how creativity and innovation can drive meaningful experiences. With a background in both technical problem-solving and artistic analysis, I am passionate about designing and building solutions that blend functionality with aesthetics.	👤	\N	\N	\N	\N	America/New_York	t	f	2026-08-12 19:36:55.57797+00	profile-photos/linkedin_604f0a91-57b5-4feb-87bb-c3a574bb6959_1786564915149.jpg
+c0268702-b677-4d0e-ab35-77cb2859e1b6	Alex Wisneski	alex.wisneski@av.vc	Senior Community Manager	Alumni Ventures	Membership Manager		initials					America/New_York	t	t	2026-08-12 20:06:19.930559+00	
+73c6b2d3-fcc6-4245-93be-18c73078bba1	Rupika Brito	rupika@av.vc	Senior Principal	Alumni Ventures	Club President		initials					America/New_York	t	t	2026-08-12 20:06:59.879904+00	
+156dab0d-8209-4064-aa60-06c97b50326c	Emily Hamilton	emily@av.vc	Senior Community Manager	Alumni Ventures	Membership Manager		initials					America/New_York	t	f	2026-08-12 20:05:09.353586+00	profile-photos/linkedin_e4521d1c-3765-41f5-91c5-0e6c2b954b4b_1786635937889.jpg
+\.
+
+
+--
+-- Data for Name: content; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY public.content (id, title, description, type, category, url, duration, thumbnail_url, author, file_name, featured, sort_order, created_at) FROM stdin;
+07465af9-a616-452e-a356-d1a505a6403f	AV 100	This curated selection of 100 ventures from AV’s portfolio of over 1,600+ current and historical investments represents the names our 10 venture teams are most excited to spotlight. These companies were selected for their variety, innovative impact, performance, and upside potential.	pdf	\N	https://wpiaagersjhhosozclla.supabase.co/storage/v1/object/public/content-files/content/1776971253283_fclbzy0pl.pdf		\N	Alumni Ventures	AV100_2026 (1).pdf	f	2	2026-04-23 19:08:40.476828+00
+a49163f0-255b-4ef2-9687-9237fc935217	The Role of Venture Capital in a Modern Portfolio	Venture capital has evolved from a niche asset class into an important part of sophisticated portfolios. This lesson provides an overview of venture capital — how it works, key pros, cons, and considerations, and why it might belong in an investor’s portfolio.	link	\N	https://video.av.vc/academy/watch/YuQhXFktq53RqP1sPiqJyA	5 min	\N	Alumni Ventures		f	0	2026-04-23 19:10:00.438718+00
+d4d3c03d-247c-4644-8d79-10fb6089733a	What is Venture Capital?	What exactly is venture capital—and why does it matter? In this quick video, we explain the vital role VC plays in fueling innovation. Venture capital provides early-stage funding to bold, high-ambition startups that aim to change the world. Learn how this unique part of the economy helps visionary entrepreneurs turn big ideas into reality.	link	\N	https://video.av.vc/avx/watch/t5rdhYynW5piowUXU9yJn9	33 sec	\N	Alumni Ventures		f	1	2026-04-23 19:15:03.84649+00
+\.
+
+
+--
+-- Data for Name: deal_interests; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY public.deal_interests (id, member_id, deal_id, interest_type, investment_amount, reason, status, email_sent, email_sent_at, email_error, created_at, updated_at, archived) FROM stdin;
+\.
+
+
+--
+-- Data for Name: deals; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY public.deals (id, company_name, headline, sector, stage, description, raise_amount, valuation, lead_investor, av_allocation, minimum_check, status, voting_deadline, deal_deadline, memo_url, deck_url, portal_url, highlights, risks, created_at, company_logo, company_url, additional_media, source_deal_id, closes_at, interest_active, archived_at) FROM stdin;
+\.
+
+
+--
+-- Data for Name: intro_requests; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY public.intro_requests (id, from_member_id, to_member_id, reason, note, proposed_format, suggested_format, status, email_shared, email_shared_at, created_at, responded_at) FROM stdin;
+\.
+
+
+--
+-- Data for Name: member_blocks; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY public.member_blocks (id, blocker_id, blocked_id, created_at) FROM stdin;
+\.
+
+
+--
+-- Data for Name: member_reports; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY public.member_reports (id, reporter_id, reported_id, reason, note, status, admin_notes, reviewed_by, reviewed_at, created_at) FROM stdin;
+\.
+
+
+--
+-- Data for Name: member_sessions; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY public.member_sessions (id, member_id, device_id, is_active, created_at) FROM stdin;
+e920bd12-4129-4f46-9264-e52be462baa9	604f0a91-57b5-4feb-87bb-c3a574bb6959	device_igpbp2ise_1786564597456	t	2026-08-12 19:56:49.981994+00
+88973efc-f111-4ce9-8161-734fa82ce746	e4521d1c-3765-41f5-91c5-0e6c2b954b4b	device_rbom9bbh1_1786635706664	t	2026-08-13 15:42:10.890377+00
+\.
+
+
+--
+-- Data for Name: members; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY public.members (id, full_name, email, must_change_password, emoji, headline, photo_url, phone, location, timezone, linkedin_url, whatsapp, calendly_url, preferred_contact, member_role, member_company, sector_interests, stage_interest, geography_preference, deal_role_preference, theme_tags, personal_statement, why_joined, hoping_to_get, vc_experience_level, learning_goals, fun_fact, outside_interests, languages, open_to_chats, chat_format, best_times, email_visible, whatsapp_visible, calendly_visible, onboarding_complete, code_of_conduct_accepted, is_manager, admin_accreditation_status, admin_check_size_band, admin_past_av_investments, admin_investment_count, admin_compliance_flags, admin_restricted_notes, admin_agreement_signed, admin_internal_owner, admin_internal_notes, admin_last_contact_date, created_at, migration_status, auth_user_id, linkedin_connected, linkedin_sub, linkedin_photo_url, linkedin_name, linkedin_connected_at, deals_disclosure_accepted_at, investment_advice_ack_at, investment_advice_ack_name, conflicts_ack_at, linkedin_prompt_skipped_at, linkedin_prompt_dismissed_at) FROM stdin;
+604f0a91-57b5-4feb-87bb-c3a574bb6959	Cate Woolsey	cate.woolsey@av.vc	f	👤	\N	profile-photos/linkedin_604f0a91-57b5-4feb-87bb-c3a574bb6959_1786564915149.jpg	\N	\N	America/New_York	\N	\N	\N	email	\N	\N	[]	[]	[]	[]	[]	\N	\N	[]	new	[]	\N	[]	[]	t	\N	[]	f	f	f	t	t	t	\N	\N	f	0	[]	\N	f	\N	\N	\N	2026-08-12 19:36:55.57797+00	pending	fc02677b-aef8-4b8c-ae7e-5ebebfaf9c77	t	jNoWxTmPkZ	profile-photos/linkedin_604f0a91-57b5-4feb-87bb-c3a574bb6959_1786564915149.jpg	Cate Woolsey	2026-08-12 20:01:55.781+00	2026-08-12 20:04:19.399+00	\N	\N	\N	\N	\N
+709452ec-1aca-4093-8ebe-f6478718468e	Alex Wisneski	alex.wisneski@av.vc	t	initials	Membership Manager		\N		America/New_York		\N	\N	email	Membership Manager	\N	[]	[]	[]	[]	[]	\N	\N	[]	new	[]	\N	[]	[]	f	\N	[]	f	f	f	f	f	t	\N	\N	f	0	[]	\N	f	\N	\N	\N	2026-08-12 20:11:23.206539+00	pending	64877953-ab32-4416-9528-549bba91bc15	f	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
+008d08db-6e38-4222-b545-d818e6bd6e36	Rupika Brito	rupika@av.vc	t	initials	Club President		\N		America/New_York		\N	\N	email	Club President	\N	[]	[]	[]	[]	[]	\N	\N	[]	new	[]	\N	[]	[]	f	\N	[]	f	f	f	f	f	t	\N	\N	f	0	[]	\N	f	\N	\N	\N	2026-08-12 20:11:35.059553+00	pending	89f3f12f-4ea4-4c25-97a6-84a9bf98c6f9	f	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
+e4521d1c-3765-41f5-91c5-0e6c2b954b4b	Emily Hamilton	emily@av.vc	f	initials	Membership Manager	profile-photos/linkedin_e4521d1c-3765-41f5-91c5-0e6c2b954b4b_1786635937889.jpg	\N		America/New_York		\N	\N	email	Membership Manager	\N	[]	[]	[]	[]	[]	\N	\N	[]	new	[]	\N	[]	[]	f	\N	[]	f	f	f	f	f	t	\N	\N	f	0	[]	\N	f	\N	\N	\N	2026-08-12 20:10:53.76377+00	pending	240357ee-d2c8-46ca-966b-69984ddf955c	t	5J9d8b8a9p	profile-photos/linkedin_e4521d1c-3765-41f5-91c5-0e6c2b954b4b_1786635937889.jpg	Emily Hamilton	2026-08-13 15:45:38.559+00	\N	\N	\N	\N	\N	\N
+1f9fd87a-3478-4785-a8b1-dc28180e14ae	Jeffrey Kocher	jeffkocher@gmail.com	t	initials			\N		America/New_York			\N	email			[]	[]	[]	[]	[]	\N	\N	[]	new	[]	\N	[]	[]	f	\N	[]	f	f	f	f	f	f	\N	\N	f	0	[]	\N	f	\N	\N	\N	2026-08-13 15:46:14.21061+00	pending	d50800b7-bed9-461f-920b-f8bca5a6057b	f	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
+\.
+
+
+--
+-- Data for Name: messages; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY public.messages (id, thread_id, from_member_id, to_member_id, intro_request_id, content, read, read_at, created_at) FROM stdin;
+\.
+
+
+--
+-- Data for Name: password_reset_codes; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY public.password_reset_codes (id, email, code_hash, expires_at, used_at, attempts, created_at) FROM stdin;
+\.
+
+
+--
+-- Data for Name: portfolio_investments; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY public.portfolio_investments (id, member_id, news, investment_date, dd_report_url, amount_invested, cost_basis, current_value, exit_status, created_at, deal_id) FROM stdin;
+\.
+
+
+--
+-- Data for Name: session_rsvps; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY public.session_rsvps (id, session_id, member_id, attending, created_at) FROM stdin;
+\.
+
+
+--
+-- Data for Name: sessions; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY public.sessions (id, title, description, type, date, "time", timezone, duration, host_name, host_title, host_linkedin, zoom_link, recording_url, deal_id, created_at, google_calendar_link, attendees, participants, meeting_notes, member_notes) FROM stdin;
+\.
+
+
+--
+-- Data for Name: site_settings; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY public.site_settings (id, club_name, club_subtitle, cohort_name, primary_color, accent_color, logo_url, created_at, logo_background_color, cohort_number, email_test_mode) FROM stdin;
+5a3aa484-d70e-4143-b320-d3ed516b3a41	Deep Tech	Venture Club		#063d54	#b4a474	/av-white-logo.png	2026-02-04 19:07:50.093105+00	#b4a474	1	t
+\.
+
+
+--
+-- Name: admin_sessions admin_sessions_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.admin_sessions
+    ADD CONSTRAINT admin_sessions_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: admin_settings admin_settings_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.admin_settings
+    ADD CONSTRAINT admin_settings_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: announcements announcements_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.announcements
+    ADD CONSTRAINT announcements_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: av_team av_team_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.av_team
+    ADD CONSTRAINT av_team_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: content content_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.content
+    ADD CONSTRAINT content_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: deal_interests deal_interests_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.deal_interests
+    ADD CONSTRAINT deal_interests_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: deals deals_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.deals
+    ADD CONSTRAINT deals_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: intro_requests intro_requests_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.intro_requests
+    ADD CONSTRAINT intro_requests_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: member_blocks member_blocks_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.member_blocks
+    ADD CONSTRAINT member_blocks_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: member_reports member_reports_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.member_reports
+    ADD CONSTRAINT member_reports_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: member_sessions member_sessions_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.member_sessions
+    ADD CONSTRAINT member_sessions_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: members members_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.members
+    ADD CONSTRAINT members_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: messages messages_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.messages
+    ADD CONSTRAINT messages_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: password_reset_codes password_reset_codes_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.password_reset_codes
+    ADD CONSTRAINT password_reset_codes_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: portfolio_investments portfolio_investments_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.portfolio_investments
+    ADD CONSTRAINT portfolio_investments_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: session_rsvps session_rsvps_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.session_rsvps
+    ADD CONSTRAINT session_rsvps_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: sessions sessions_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.sessions
+    ADD CONSTRAINT sessions_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: site_settings site_settings_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.site_settings
+    ADD CONSTRAINT site_settings_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: admin_sessions_device_id_key; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX admin_sessions_device_id_key ON public.admin_sessions USING btree (device_id);
+
+
+--
+-- Name: av_team_email_key; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX av_team_email_key ON public.av_team USING btree (email);
+
+
+--
+-- Name: deal_interests_archived_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX deal_interests_archived_idx ON public.deal_interests USING btree (archived);
+
+
+--
+-- Name: deal_interests_unique_member_deal; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX deal_interests_unique_member_deal ON public.deal_interests USING btree (member_id, deal_id);
+
+
+--
+-- Name: idx_admin_sessions_device; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_admin_sessions_device ON public.admin_sessions USING btree (device_id);
+
+
+--
+-- Name: idx_av_team_email; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_av_team_email ON public.av_team USING btree (email);
+
+
+--
+-- Name: idx_av_team_visible; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_av_team_visible ON public.av_team USING btree (is_visible_to_members) WHERE (is_visible_to_members = true);
+
+
+--
+-- Name: idx_deal_interests_deal_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_deal_interests_deal_id ON public.deal_interests USING btree (deal_id);
+
+
+--
+-- Name: idx_deal_interests_member_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_deal_interests_member_id ON public.deal_interests USING btree (member_id);
+
+
+--
+-- Name: idx_deal_interests_status; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_deal_interests_status ON public.deal_interests USING btree (status);
+
+
+--
+-- Name: idx_deals_source_deal_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_deals_source_deal_id ON public.deals USING btree (source_deal_id);
+
+
+--
+-- Name: idx_deals_status; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_deals_status ON public.deals USING btree (status);
+
+
+--
+-- Name: idx_intro_requests_members; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_intro_requests_members ON public.intro_requests USING btree (from_member_id, to_member_id);
+
+
+--
+-- Name: idx_member_sessions_device; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_member_sessions_device ON public.member_sessions USING btree (device_id);
+
+
+--
+-- Name: idx_members_auth_user_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_members_auth_user_id ON public.members USING btree (auth_user_id);
+
+
+--
+-- Name: idx_members_email; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_members_email ON public.members USING btree (email);
+
+
+--
+-- Name: idx_messages_members; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_messages_members ON public.messages USING btree (from_member_id, to_member_id);
+
+
+--
+-- Name: idx_portfolio_member; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_portfolio_member ON public.portfolio_investments USING btree (member_id);
+
+
+--
+-- Name: idx_pwr_email_active; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_pwr_email_active ON public.password_reset_codes USING btree (email, expires_at DESC) WHERE (used_at IS NULL);
+
+
+--
+-- Name: idx_sessions_date; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_sessions_date ON public.sessions USING btree (date);
+
+
+--
+-- Name: members_email_key; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX members_email_key ON public.members USING btree (email);
+
+
+--
+-- Name: announcements announcements_author_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.announcements
+    ADD CONSTRAINT announcements_author_id_fkey FOREIGN KEY (author_id) REFERENCES public.members(id);
+
+
+--
+-- Name: deal_interests deal_interests_deal_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.deal_interests
+    ADD CONSTRAINT deal_interests_deal_id_fkey FOREIGN KEY (deal_id) REFERENCES public.deals(id) ON DELETE CASCADE;
+
+
+--
+-- Name: deal_interests deal_interests_member_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.deal_interests
+    ADD CONSTRAINT deal_interests_member_id_fkey FOREIGN KEY (member_id) REFERENCES public.members(id) ON DELETE CASCADE;
+
+
+--
+-- Name: intro_requests intro_requests_from_member_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.intro_requests
+    ADD CONSTRAINT intro_requests_from_member_id_fkey FOREIGN KEY (from_member_id) REFERENCES public.members(id) ON DELETE CASCADE;
+
+
+--
+-- Name: intro_requests intro_requests_to_member_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.intro_requests
+    ADD CONSTRAINT intro_requests_to_member_id_fkey FOREIGN KEY (to_member_id) REFERENCES public.members(id) ON DELETE CASCADE;
+
+
+--
+-- Name: member_blocks member_blocks_blocked_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.member_blocks
+    ADD CONSTRAINT member_blocks_blocked_id_fkey FOREIGN KEY (blocked_id) REFERENCES public.members(id) ON DELETE CASCADE;
+
+
+--
+-- Name: member_blocks member_blocks_blocker_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.member_blocks
+    ADD CONSTRAINT member_blocks_blocker_id_fkey FOREIGN KEY (blocker_id) REFERENCES public.members(id) ON DELETE CASCADE;
+
+
+--
+-- Name: member_reports member_reports_reported_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.member_reports
+    ADD CONSTRAINT member_reports_reported_id_fkey FOREIGN KEY (reported_id) REFERENCES public.members(id) ON DELETE CASCADE;
+
+
+--
+-- Name: member_reports member_reports_reporter_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.member_reports
+    ADD CONSTRAINT member_reports_reporter_id_fkey FOREIGN KEY (reporter_id) REFERENCES public.members(id) ON DELETE CASCADE;
+
+
+--
+-- Name: member_sessions member_sessions_member_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.member_sessions
+    ADD CONSTRAINT member_sessions_member_id_fkey FOREIGN KEY (member_id) REFERENCES public.members(id) ON DELETE CASCADE;
+
+
+--
+-- Name: messages messages_from_member_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.messages
+    ADD CONSTRAINT messages_from_member_id_fkey FOREIGN KEY (from_member_id) REFERENCES public.members(id) ON DELETE CASCADE;
+
+
+--
+-- Name: messages messages_intro_request_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.messages
+    ADD CONSTRAINT messages_intro_request_id_fkey FOREIGN KEY (intro_request_id) REFERENCES public.intro_requests(id);
+
+
+--
+-- Name: messages messages_to_member_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.messages
+    ADD CONSTRAINT messages_to_member_id_fkey FOREIGN KEY (to_member_id) REFERENCES public.members(id) ON DELETE CASCADE;
+
+
+--
+-- Name: portfolio_investments portfolio_investments_deal_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.portfolio_investments
+    ADD CONSTRAINT portfolio_investments_deal_id_fkey FOREIGN KEY (deal_id) REFERENCES public.deals(id) ON DELETE CASCADE;
+
+
+--
+-- Name: portfolio_investments portfolio_investments_member_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.portfolio_investments
+    ADD CONSTRAINT portfolio_investments_member_id_fkey FOREIGN KEY (member_id) REFERENCES public.members(id) ON DELETE CASCADE;
+
+
+--
+-- Name: session_rsvps session_rsvps_member_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.session_rsvps
+    ADD CONSTRAINT session_rsvps_member_id_fkey FOREIGN KEY (member_id) REFERENCES public.members(id) ON DELETE CASCADE;
+
+
+--
+-- Name: session_rsvps session_rsvps_session_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.session_rsvps
+    ADD CONSTRAINT session_rsvps_session_id_fkey FOREIGN KEY (session_id) REFERENCES public.sessions(id) ON DELETE CASCADE;
+
+
+--
+-- Name: av_team AV team readable by all; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "AV team readable by all" ON public.av_team FOR SELECT USING (true);
+
+
+--
+-- Name: av_team AV team writable by service role; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "AV team writable by service role" ON public.av_team USING (true);
+
+
+--
+-- Name: admin_sessions Admin sessions readable by all; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Admin sessions readable by all" ON public.admin_sessions FOR SELECT USING (true);
+
+
+--
+-- Name: admin_sessions Admin sessions writable by service role; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Admin sessions writable by service role" ON public.admin_sessions USING (true);
+
+
+--
+-- Name: deal_interests Admins can delete deal interests; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Admins can delete deal interests" ON public.deal_interests FOR DELETE TO authenticated USING ((EXISTS ( SELECT 1
+   FROM public.members
+  WHERE ((members.auth_user_id = auth.uid()) AND (members.is_manager = true)))));
+
+
+--
+-- Name: announcements Allow all; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Allow all" ON public.announcements USING (true);
+
+
+--
+-- Name: av_team Allow all; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Allow all" ON public.av_team USING (true);
+
+
+--
+-- Name: content Allow all; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Allow all" ON public.content USING (true);
+
+
+--
+-- Name: deals Allow all; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Allow all" ON public.deals USING (true);
+
+
+--
+-- Name: intro_requests Allow all; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Allow all" ON public.intro_requests USING (true);
+
+
+--
+-- Name: member_blocks Allow all; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Allow all" ON public.member_blocks USING (true);
+
+
+--
+-- Name: member_reports Allow all; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Allow all" ON public.member_reports USING (true);
+
+
+--
+-- Name: members Allow all; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Allow all" ON public.members USING (true);
+
+
+--
+-- Name: messages Allow all; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Allow all" ON public.messages USING (true);
+
+
+--
+-- Name: portfolio_investments Allow all; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Allow all" ON public.portfolio_investments USING (true);
+
+
+--
+-- Name: session_rsvps Allow all; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Allow all" ON public.session_rsvps USING (true);
+
+
+--
+-- Name: sessions Allow all; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Allow all" ON public.sessions USING (true);
+
+
+--
+-- Name: site_settings Allow all; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Allow all" ON public.site_settings USING (true);
+
+
+--
+-- Name: announcements Allow all operations; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Allow all operations" ON public.announcements USING (true) WITH CHECK (true);
+
+
+--
+-- Name: av_team Allow all operations; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Allow all operations" ON public.av_team USING (true) WITH CHECK (true);
+
+
+--
+-- Name: content Allow all operations; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Allow all operations" ON public.content USING (true) WITH CHECK (true);
+
+
+--
+-- Name: deals Allow all operations; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Allow all operations" ON public.deals USING (true) WITH CHECK (true);
+
+
+--
+-- Name: intro_requests Allow all operations; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Allow all operations" ON public.intro_requests USING (true) WITH CHECK (true);
+
+
+--
+-- Name: member_blocks Allow all operations; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Allow all operations" ON public.member_blocks USING (true) WITH CHECK (true);
+
+
+--
+-- Name: member_reports Allow all operations; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Allow all operations" ON public.member_reports USING (true) WITH CHECK (true);
+
+
+--
+-- Name: members Allow all operations; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Allow all operations" ON public.members USING (true) WITH CHECK (true);
+
+
+--
+-- Name: messages Allow all operations; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Allow all operations" ON public.messages USING (true) WITH CHECK (true);
+
+
+--
+-- Name: portfolio_investments Allow all operations; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Allow all operations" ON public.portfolio_investments USING (true) WITH CHECK (true);
+
+
+--
+-- Name: session_rsvps Allow all operations; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Allow all operations" ON public.session_rsvps USING (true) WITH CHECK (true);
+
+
+--
+-- Name: sessions Allow all operations; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Allow all operations" ON public.sessions USING (true) WITH CHECK (true);
+
+
+--
+-- Name: site_settings Allow all operations; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Allow all operations" ON public.site_settings USING (true) WITH CHECK (true);
+
+
+--
+-- Name: announcements Announcements readable by all; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Announcements readable by all" ON public.announcements FOR SELECT USING (true);
+
+
+--
+-- Name: announcements Announcements writable by service role; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Announcements writable by service role" ON public.announcements USING (true);
+
+
+--
+-- Name: announcements Authenticated users can view announcements; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Authenticated users can view announcements" ON public.announcements FOR SELECT TO authenticated USING (true);
+
+
+--
+-- Name: content Authenticated users can view content; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Authenticated users can view content" ON public.content FOR SELECT TO authenticated USING (true);
+
+
+--
+-- Name: deals Authenticated users can view deals; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Authenticated users can view deals" ON public.deals FOR SELECT TO authenticated USING (true);
+
+
+--
+-- Name: sessions Authenticated users can view sessions; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Authenticated users can view sessions" ON public.sessions FOR SELECT TO authenticated USING (true);
+
+
+--
+-- Name: content Content readable by all; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Content readable by all" ON public.content FOR SELECT USING (true);
+
+
+--
+-- Name: content Content writable by service role; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Content writable by service role" ON public.content USING (true);
+
+
+--
+-- Name: deals Deals readable by all; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Deals readable by all" ON public.deals FOR SELECT USING (true);
+
+
+--
+-- Name: deals Deals writable by service role; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Deals writable by service role" ON public.deals USING (true);
+
+
+--
+-- Name: members Enable delete for service role; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Enable delete for service role" ON public.members FOR DELETE TO service_role USING (true);
+
+
+--
+-- Name: members Enable insert for service role; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Enable insert for service role" ON public.members FOR INSERT TO service_role WITH CHECK (true);
+
+
+--
+-- Name: members Enable read access for authenticated users; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Enable read access for authenticated users" ON public.members FOR SELECT TO authenticated USING (true);
+
+
+--
+-- Name: members Enable update for own profile; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Enable update for own profile" ON public.members FOR UPDATE TO authenticated USING ((auth.uid() = auth_user_id)) WITH CHECK ((auth.uid() = auth_user_id));
+
+
+--
+-- Name: members Enable update for service role; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Enable update for service role" ON public.members FOR UPDATE TO service_role USING (true) WITH CHECK (true);
+
+
+--
+-- Name: intro_requests Intro requests readable by all; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Intro requests readable by all" ON public.intro_requests FOR SELECT USING (true);
+
+
+--
+-- Name: intro_requests Intro requests writable by service role; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Intro requests writable by service role" ON public.intro_requests USING (true);
+
+
+--
+-- Name: member_blocks Member blocks readable by all; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Member blocks readable by all" ON public.member_blocks FOR SELECT USING (true);
+
+
+--
+-- Name: member_blocks Member blocks writable by service role; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Member blocks writable by service role" ON public.member_blocks USING (true);
+
+
+--
+-- Name: member_reports Member reports readable by all; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Member reports readable by all" ON public.member_reports FOR SELECT USING (true);
+
+
+--
+-- Name: member_reports Member reports writable by service role; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Member reports writable by service role" ON public.member_reports USING (true);
+
+
+--
+-- Name: member_sessions Member sessions readable by all; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Member sessions readable by all" ON public.member_sessions FOR SELECT USING (true);
+
+
+--
+-- Name: member_sessions Member sessions writable by service role; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Member sessions writable by service role" ON public.member_sessions USING (true);
+
+
+--
+-- Name: deal_interests Members can insert their own interests; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Members can insert their own interests" ON public.deal_interests FOR INSERT WITH CHECK (true);
+
+
+--
+-- Name: deal_interests Members can update their own interests; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Members can update their own interests" ON public.deal_interests FOR UPDATE USING (true);
+
+
+--
+-- Name: deal_interests Members can view their own interests; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Members can view their own interests" ON public.deal_interests FOR SELECT USING (true);
+
+
+--
+-- Name: members Members readable by all; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Members readable by all" ON public.members FOR SELECT USING (true);
+
+
+--
+-- Name: members Members writable by service role; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Members writable by service role" ON public.members USING (true);
+
+
+--
+-- Name: messages Messages readable by all; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Messages readable by all" ON public.messages FOR SELECT USING (true);
+
+
+--
+-- Name: messages Messages writable by service role; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Messages writable by service role" ON public.messages USING (true);
+
+
+--
+-- Name: portfolio_investments Portfolio investments readable by all; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Portfolio investments readable by all" ON public.portfolio_investments FOR SELECT USING (true);
+
+
+--
+-- Name: portfolio_investments Portfolio investments writable by service role; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Portfolio investments writable by service role" ON public.portfolio_investments USING (true);
+
+
+--
+-- Name: announcements Public read; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Public read" ON public.announcements FOR SELECT USING (true);
+
+
+--
+-- Name: av_team Public read; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Public read" ON public.av_team FOR SELECT USING (true);
+
+
+--
+-- Name: content Public read; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Public read" ON public.content FOR SELECT USING (true);
+
+
+--
+-- Name: deals Public read; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Public read" ON public.deals FOR SELECT USING (true);
+
+
+--
+-- Name: intro_requests Public read; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Public read" ON public.intro_requests FOR SELECT USING (true);
+
+
+--
+-- Name: member_blocks Public read; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Public read" ON public.member_blocks FOR SELECT USING (true);
+
+
+--
+-- Name: member_reports Public read; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Public read" ON public.member_reports FOR SELECT USING (true);
+
+
+--
+-- Name: members Public read; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Public read" ON public.members FOR SELECT USING (true);
+
+
+--
+-- Name: messages Public read; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Public read" ON public.messages FOR SELECT USING (true);
+
+
+--
+-- Name: portfolio_investments Public read; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Public read" ON public.portfolio_investments FOR SELECT USING (true);
+
+
+--
+-- Name: session_rsvps Public read; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Public read" ON public.session_rsvps FOR SELECT USING (true);
+
+
+--
+-- Name: sessions Public read; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Public read" ON public.sessions FOR SELECT USING (true);
+
+
+--
+-- Name: site_settings Public read; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Public read" ON public.site_settings FOR SELECT USING (true);
+
+
+--
+-- Name: admin_sessions Service only; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Service only" ON public.admin_sessions USING (true);
+
+
+--
+-- Name: member_sessions Service only; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Service only" ON public.member_sessions USING (true);
+
+
+--
+-- Name: members Service role has full access; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Service role has full access" ON public.members TO service_role USING (true) WITH CHECK (true);
+
+
+--
+-- Name: session_rsvps Service role has full access to RSVPs; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Service role has full access to RSVPs" ON public.session_rsvps TO service_role USING (true) WITH CHECK (true);
+
+
+--
+-- Name: deal_interests Service role has full access to deal interests; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Service role has full access to deal interests" ON public.deal_interests TO service_role USING (true) WITH CHECK (true);
+
+
+--
+-- Name: announcements Service write; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Service write" ON public.announcements USING (true);
+
+
+--
+-- Name: av_team Service write; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Service write" ON public.av_team USING (true);
+
+
+--
+-- Name: content Service write; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Service write" ON public.content USING (true);
+
+
+--
+-- Name: deals Service write; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Service write" ON public.deals USING (true);
+
+
+--
+-- Name: intro_requests Service write; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Service write" ON public.intro_requests USING (true);
+
+
+--
+-- Name: member_blocks Service write; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Service write" ON public.member_blocks USING (true);
+
+
+--
+-- Name: member_reports Service write; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Service write" ON public.member_reports USING (true);
+
+
+--
+-- Name: members Service write; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Service write" ON public.members USING (true);
+
+
+--
+-- Name: messages Service write; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Service write" ON public.messages USING (true);
+
+
+--
+-- Name: portfolio_investments Service write; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Service write" ON public.portfolio_investments USING (true);
+
+
+--
+-- Name: session_rsvps Service write; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Service write" ON public.session_rsvps USING (true);
+
+
+--
+-- Name: sessions Service write; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Service write" ON public.sessions USING (true);
+
+
+--
+-- Name: site_settings Service write; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Service write" ON public.site_settings USING (true);
+
+
+--
+-- Name: session_rsvps Session RSVPs readable by all; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Session RSVPs readable by all" ON public.session_rsvps FOR SELECT USING (true);
+
+
+--
+-- Name: session_rsvps Session RSVPs writable by service role; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Session RSVPs writable by service role" ON public.session_rsvps USING (true);
+
+
+--
+-- Name: sessions Sessions readable by all; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Sessions readable by all" ON public.sessions FOR SELECT USING (true);
+
+
+--
+-- Name: sessions Sessions writable by service role; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Sessions writable by service role" ON public.sessions USING (true);
+
+
+--
+-- Name: site_settings Site settings readable by all; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Site settings readable by all" ON public.site_settings FOR SELECT USING (true);
+
+
+--
+-- Name: site_settings Site settings writable by service role; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Site settings writable by service role" ON public.site_settings USING (true);
+
+
+--
+-- Name: session_rsvps Users can manage own RSVPs; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Users can manage own RSVPs" ON public.session_rsvps TO authenticated USING ((member_id IN ( SELECT members.id
+   FROM public.members
+  WHERE (members.auth_user_id = auth.uid())))) WITH CHECK ((member_id IN ( SELECT members.id
+   FROM public.members
+  WHERE (members.auth_user_id = auth.uid()))));
+
+
+--
+-- Name: deal_interests Users can manage own deal interests; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Users can manage own deal interests" ON public.deal_interests FOR INSERT TO authenticated WITH CHECK ((member_id IN ( SELECT members.id
+   FROM public.members
+  WHERE (members.auth_user_id = auth.uid()))));
+
+
+--
+-- Name: members Users can update own member data; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Users can update own member data" ON public.members FOR UPDATE TO authenticated USING ((auth_user_id = auth.uid())) WITH CHECK ((auth_user_id = auth.uid()));
+
+
+--
+-- Name: session_rsvps Users can view own RSVPs; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Users can view own RSVPs" ON public.session_rsvps FOR SELECT TO authenticated USING ((member_id IN ( SELECT members.id
+   FROM public.members
+  WHERE (members.auth_user_id = auth.uid()))));
+
+
+--
+-- Name: deal_interests Users can view own deal interests; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Users can view own deal interests" ON public.deal_interests FOR SELECT TO authenticated USING ((member_id IN ( SELECT members.id
+   FROM public.members
+  WHERE (members.auth_user_id = auth.uid()))));
+
+
+--
+-- Name: members Users can view own member data; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "Users can view own member data" ON public.members FOR SELECT TO authenticated USING ((auth_user_id = auth.uid()));
+
+
+--
+-- Name: admin_sessions; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.admin_sessions ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: admin_settings; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.admin_settings ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: announcements; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.announcements ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: av_team; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.av_team ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: content; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.content ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: deal_interests; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.deal_interests ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: deals; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.deals ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: intro_requests; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.intro_requests ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: member_blocks; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.member_blocks ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: member_reports; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.member_reports ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: member_sessions; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.member_sessions ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: members; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.members ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: messages; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.messages ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: password_reset_codes; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.password_reset_codes ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: portfolio_investments; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.portfolio_investments ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: session_rsvps; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.session_rsvps ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: sessions; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.sessions ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: site_settings; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.site_settings ENABLE ROW LEVEL SECURITY;
+
+--
+-- PostgreSQL database dump complete
+--
+
+\unrestrict Rc189lXLKcLfmvELOkt1wTuXgJWkpA2isn2jWwsY6How0lVNEKWgpcL1IIu7ljw
+
