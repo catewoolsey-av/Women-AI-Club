@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict Rc189lXLKcLfmvELOkt1wTuXgJWkpA2isn2jWwsY6How0lVNEKWgpcL1IIu7ljw
+\restrict A9EWxXtByURCHSQK969nyG8VxfxQ22pKeB4Slxu6CmuzYA0ZymYZ6JBf8WPqEcZ
 
 -- Dumped from database version 17.6
 -- Dumped by pg_dump version 17.8 (Homebrew)
@@ -488,8 +488,6 @@ CREATE TABLE public.site_settings (
 --
 
 COPY public.admin_sessions (id, device_id, is_active, created_at) FROM stdin;
-b4ecc5ee-4124-43e9-8fbd-6e227e86e000	device_igpbp2ise_1786564597456	t	2026-08-12 20:10:50.893797+00
-e1d4dbcf-df66-4880-83b4-0f095347ce3f	device_rbom9bbh1_1786635706664	t	2026-08-13 15:45:42.326067+00
 \.
 
 
@@ -514,10 +512,6 @@ COPY public.announcements (id, title, content, author, is_pinned, created_at, au
 --
 
 COPY public.av_team (id, full_name, email, title, company, club_role, bio, emoji, fun_fact, linkedin_url, phone, location, timezone, is_active, is_visible_to_members, created_at, photo_url) FROM stdin;
-a1b904f3-07d3-4272-8694-23ca73e8d552	Cate Woolsey	cate.woolsey@av.vc	AI Associate	Alumni Ventures	Club Operations	I recently graduated from Middlebury College, where I majored in Computer Science and minored in the History of Art and Architecture. My interests lie at the intersection of art, technology, and growth—exploring how creativity and innovation can drive meaningful experiences. With a background in both technical problem-solving and artistic analysis, I am passionate about designing and building solutions that blend functionality with aesthetics.	👤	\N	\N	\N	\N	America/New_York	t	f	2026-08-12 19:36:55.57797+00	profile-photos/linkedin_604f0a91-57b5-4feb-87bb-c3a574bb6959_1786564915149.jpg
-c0268702-b677-4d0e-ab35-77cb2859e1b6	Alex Wisneski	alex.wisneski@av.vc	Senior Community Manager	Alumni Ventures	Membership Manager		initials					America/New_York	t	t	2026-08-12 20:06:19.930559+00	
-73c6b2d3-fcc6-4245-93be-18c73078bba1	Rupika Brito	rupika@av.vc	Senior Principal	Alumni Ventures	Club President		initials					America/New_York	t	t	2026-08-12 20:06:59.879904+00	
-156dab0d-8209-4064-aa60-06c97b50326c	Emily Hamilton	emily@av.vc	Senior Community Manager	Alumni Ventures	Membership Manager		initials					America/New_York	t	f	2026-08-12 20:05:09.353586+00	profile-photos/linkedin_e4521d1c-3765-41f5-91c5-0e6c2b954b4b_1786635937889.jpg
 \.
 
 
@@ -577,8 +571,6 @@ COPY public.member_reports (id, reporter_id, reported_id, reason, note, status, 
 --
 
 COPY public.member_sessions (id, member_id, device_id, is_active, created_at) FROM stdin;
-e920bd12-4129-4f46-9264-e52be462baa9	604f0a91-57b5-4feb-87bb-c3a574bb6959	device_igpbp2ise_1786564597456	t	2026-08-12 19:56:49.981994+00
-88973efc-f111-4ce9-8161-734fa82ce746	e4521d1c-3765-41f5-91c5-0e6c2b954b4b	device_rbom9bbh1_1786635706664	t	2026-08-13 15:42:10.890377+00
 \.
 
 
@@ -587,11 +579,6 @@ e920bd12-4129-4f46-9264-e52be462baa9	604f0a91-57b5-4feb-87bb-c3a574bb6959	device
 --
 
 COPY public.members (id, full_name, email, must_change_password, emoji, headline, photo_url, phone, location, timezone, linkedin_url, whatsapp, calendly_url, preferred_contact, member_role, member_company, sector_interests, stage_interest, geography_preference, deal_role_preference, theme_tags, personal_statement, why_joined, hoping_to_get, vc_experience_level, learning_goals, fun_fact, outside_interests, languages, open_to_chats, chat_format, best_times, email_visible, whatsapp_visible, calendly_visible, onboarding_complete, code_of_conduct_accepted, is_manager, admin_accreditation_status, admin_check_size_band, admin_past_av_investments, admin_investment_count, admin_compliance_flags, admin_restricted_notes, admin_agreement_signed, admin_internal_owner, admin_internal_notes, admin_last_contact_date, created_at, migration_status, auth_user_id, linkedin_connected, linkedin_sub, linkedin_photo_url, linkedin_name, linkedin_connected_at, deals_disclosure_accepted_at, investment_advice_ack_at, investment_advice_ack_name, conflicts_ack_at, linkedin_prompt_skipped_at, linkedin_prompt_dismissed_at) FROM stdin;
-604f0a91-57b5-4feb-87bb-c3a574bb6959	Cate Woolsey	cate.woolsey@av.vc	f	👤	\N	profile-photos/linkedin_604f0a91-57b5-4feb-87bb-c3a574bb6959_1786564915149.jpg	\N	\N	America/New_York	\N	\N	\N	email	\N	\N	[]	[]	[]	[]	[]	\N	\N	[]	new	[]	\N	[]	[]	t	\N	[]	f	f	f	t	t	t	\N	\N	f	0	[]	\N	f	\N	\N	\N	2026-08-12 19:36:55.57797+00	pending	fc02677b-aef8-4b8c-ae7e-5ebebfaf9c77	t	jNoWxTmPkZ	profile-photos/linkedin_604f0a91-57b5-4feb-87bb-c3a574bb6959_1786564915149.jpg	Cate Woolsey	2026-08-12 20:01:55.781+00	2026-08-12 20:04:19.399+00	\N	\N	\N	\N	\N
-709452ec-1aca-4093-8ebe-f6478718468e	Alex Wisneski	alex.wisneski@av.vc	t	initials	Membership Manager		\N		America/New_York		\N	\N	email	Membership Manager	\N	[]	[]	[]	[]	[]	\N	\N	[]	new	[]	\N	[]	[]	f	\N	[]	f	f	f	f	f	t	\N	\N	f	0	[]	\N	f	\N	\N	\N	2026-08-12 20:11:23.206539+00	pending	64877953-ab32-4416-9528-549bba91bc15	f	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
-008d08db-6e38-4222-b545-d818e6bd6e36	Rupika Brito	rupika@av.vc	t	initials	Club President		\N		America/New_York		\N	\N	email	Club President	\N	[]	[]	[]	[]	[]	\N	\N	[]	new	[]	\N	[]	[]	f	\N	[]	f	f	f	f	f	t	\N	\N	f	0	[]	\N	f	\N	\N	\N	2026-08-12 20:11:35.059553+00	pending	89f3f12f-4ea4-4c25-97a6-84a9bf98c6f9	f	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
-e4521d1c-3765-41f5-91c5-0e6c2b954b4b	Emily Hamilton	emily@av.vc	f	initials	Membership Manager	profile-photos/linkedin_e4521d1c-3765-41f5-91c5-0e6c2b954b4b_1786635937889.jpg	\N		America/New_York		\N	\N	email	Membership Manager	\N	[]	[]	[]	[]	[]	\N	\N	[]	new	[]	\N	[]	[]	f	\N	[]	f	f	f	f	f	t	\N	\N	f	0	[]	\N	f	\N	\N	\N	2026-08-12 20:10:53.76377+00	pending	240357ee-d2c8-46ca-966b-69984ddf955c	t	5J9d8b8a9p	profile-photos/linkedin_e4521d1c-3765-41f5-91c5-0e6c2b954b4b_1786635937889.jpg	Emily Hamilton	2026-08-13 15:45:38.559+00	\N	\N	\N	\N	\N	\N
-1f9fd87a-3478-4785-a8b1-dc28180e14ae	Jeffrey Kocher	jeffkocher@gmail.com	t	initials			\N		America/New_York			\N	email			[]	[]	[]	[]	[]	\N	\N	[]	new	[]	\N	[]	[]	f	\N	[]	f	f	f	f	f	f	\N	\N	f	0	[]	\N	f	\N	\N	\N	2026-08-13 15:46:14.21061+00	pending	d50800b7-bed9-461f-920b-f8bca5a6057b	f	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
 \.
 
 
@@ -1937,5 +1924,5 @@ ALTER TABLE public.site_settings ENABLE ROW LEVEL SECURITY;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict Rc189lXLKcLfmvELOkt1wTuXgJWkpA2isn2jWwsY6How0lVNEKWgpcL1IIu7ljw
+\unrestrict A9EWxXtByURCHSQK969nyG8VxfxQ22pKeB4Slxu6CmuzYA0ZymYZ6JBf8WPqEcZ
 
