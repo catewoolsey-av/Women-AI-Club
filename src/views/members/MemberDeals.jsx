@@ -311,7 +311,7 @@ const MemberDeals = ({ deals: allDeals, currentUser }) => {
           .order('created_at', { ascending: false })
           .limit(1)
           .maybeSingle();
-        const clubDisplayName = siteSettingsData?.club_name || "Deep Tech Venture Club";
+        const clubDisplayName = siteSettingsData?.club_name || "Women Investing in AI Venture Club";
 
         const interestTypeLabels = {
           'want_to_invest': 'wants to invest in',
